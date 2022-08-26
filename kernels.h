@@ -8,5 +8,6 @@
 #include "./header_file/kernel8.h"
 #include "./header_file/kernel_test1.h"
 #include "./header_file/kernel_test2.h"
+#include "./header_file/kernel_test3.h"
 // #include "test.h"
 // #include "./header_file/kernel9.h"

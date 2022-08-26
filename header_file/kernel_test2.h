@@ -8,7 +8,7 @@
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
 
 #define ms 256
-#define ks 256
+#define ks 512
 
 
 void micro_kernel_4x4(int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
