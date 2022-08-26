@@ -43,8 +43,7 @@ void dgemm_kernel_v6(int M, int N, int K, double alpha, double *A, int LDA, doub
 		for(int i=0;i<M*N;i++)
 			C[i] *= beta; 
 	}
-
-	
+    
 	int m1 = M - M%4; 
 	int n1 = N - N%4; 
 	int k1 = K - K%4; 
@@ -83,14 +82,9 @@ void dgemm_kernel_v6(int M, int N, int K, double alpha, double *A, int LDA, doub
 	
 	
 	if(M != m1)
-	{
-		dgemm_boundary_v6(M-m1, N, K, alpha, A+m1, LDA, B, LDB, C+m1, LDC); 
-	}
+		dgemm_boundary_v6(M-m1, N, K, alpha, A+m1, LDA, B, LDB, C+m1, LDC);
 
 	if(N != n1)
-	{
-		// printf("h1\n");
 		dgemm_boundary_v6(m1, N-n1, K, alpha, A, LDA, &B(0, n1), LDB, &C(0, n1), LDC); 
-	}
 
 }

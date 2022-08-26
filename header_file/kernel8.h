@@ -138,15 +138,9 @@ void dgemm_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, doub
 
 				sub_dgemm_kernel_v8(mstep, nstep, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, npos), LDB, &C(mpos, npos), LDC); 
 
-
 			}	
 		}
 
 	}
-
-
-
-
-
 
 }

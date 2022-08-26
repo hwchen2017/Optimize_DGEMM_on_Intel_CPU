@@ -31,8 +31,10 @@ void test_dgemm_kernel(int num, int M, int N, int K, double alpha, double *A, do
 		break; 
 		case 8: dgemm_kernel_v8(M, N, K, alpha, A, M, B, K, beta, C, M); 
 		break;
-		case 9: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
-		break;       
+        case 0: dgemm_kernel_vt(M, N, K, alpha, A, M, B, K, beta, C, M); 
+		break;
+// 		case 9: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
+// 		break;       
 	}
 }
 
@@ -40,16 +42,16 @@ void test_dgemm_kernel(int num, int M, int N, int K, double alpha, double *A, do
 int main(int argc, char *argv[])
 {
 
-	int kernel_num = 1; 
+	int kernel_num = 0; 
 
 	if(argc == 2) kernel_num=atoi(argv[1]);
 
 	// cout<<kernel_num<<endl; 
 
-	vector<int> ms; 
+	vector<int> ss; 
 
 	for(int i=1;i<=25;i++)
-		ms.push_back(i*128); 
+		ss.push_back(i*128); 
 
 
 
@@ -58,9 +60,9 @@ int main(int argc, char *argv[])
 	double *A, *B, *C, *C_mkl;
 
 	double alpha = 1.0, beta = 0.0; 
-	ms[3] = 1024; 
+	ss[3] = 1024; 
 
-	M = ms[3], N = ms[3], K = ms[3]; 
+	M = ss[3], N = ss[3], K = ss[3]; 
 
 	printf("Matrix Size: %dX%d, %dX%d\n\n", M, K, K, N ); 
 
@@ -80,7 +82,7 @@ int main(int argc, char *argv[])
 	// memset(C, 0, sizeof(C)); 
 	// memset(C_mkl, 0, sizeof(C_mkl));
 
-
+    memset(C, 0, sizeof(C));
 
 	auto start = std::chrono::high_resolution_clock::now();
 	test_dgemm_kernel(kernel_num, M, N, K, alpha, A, B, beta, C); 
@@ -91,7 +93,21 @@ int main(int argc, char *argv[])
 	double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3;
 
 	cout<<"===================MY CPU code====================="<<endl;
-	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl<<endl;
+	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl;
+    cout<<2.*1e-6*M*N*K/time_ms<<endl<<endl; 
+    
+//     memset(C, 0, sizeof(C));
+    
+//     start = std::chrono::high_resolution_clock::now();
+// 	MY_MMult(M, N, K, A, M, B, K, C, N); 
+
+// 	end = std::chrono::high_resolution_clock::now(); 
+// 	elapsed = end - start;
+
+// 	time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3;
+
+// 	cout<<"===================Flame CPU code====================="<<endl;
+// 	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl<<endl;
 
 
 	mkl_set_num_threads(1); 
@@ -105,7 +121,7 @@ int main(int argc, char *argv[])
 	elapsed = end - start; 
 
 	time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3 ;
-	// cout<<"Time: "<<time_ms<<" ms"<<endl;
+// 	cout<<"Time: "<<time_ms<<" ms"<<endl;
 
 
 	start = std::chrono::high_resolution_clock::now();
@@ -118,10 +134,8 @@ int main(int argc, char *argv[])
 	time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3 ;
 
 	cout<<"===================Intel MKL code====================="<<endl;
-	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl<<endl;
-
-
-	// cout<<2.*1e-6*M*N*K/time_ms<<endl; 
+	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl;
+	cout<<2.*1e-6*M*N*K/time_ms<<endl<<endl; 
 
 
 
