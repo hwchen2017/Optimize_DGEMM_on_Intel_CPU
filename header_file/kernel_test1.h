@@ -12,7 +12,7 @@
 
 
 
-void inner_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB,  double *C, int LDC)
+void inner_kernel_t1(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB,  double *C, int LDC)
 {
 
 
@@ -20,8 +20,8 @@ void inner_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, doub
     __m256d c0, c1, c2, c3; 
     __m256d a, b0, b1, b2, b3;
 
-	for(int i=0;i<M;i+=4)
-		for(int j=0;j<N;j+=4)
+    for(int j=0;j<N;j+=4)
+        for(int i=0;i<M;i+=4)
 		{
 			
 			c0 = _mm256_setzero_pd(); 
@@ -55,7 +55,7 @@ void inner_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, doub
 }
 
 
-void dgemm_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double beta, double *C, int LDC)
+void dgemm_kernel_t1(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double beta, double *C, int LDC)
 {
 
 
@@ -65,7 +65,7 @@ void dgemm_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, doub
 			C[i] *= beta; 
 	}
     
-    printf("Working kernel!\n");
+//     printf("Working kernel!\n");
 
 	int mstep, kstep; 
 		
@@ -77,7 +77,7 @@ void dgemm_kernel_vt(int M, int N, int K, double alpha, double *A, int LDA, doub
         {
            mstep = min(ms, M - mpos);
 
-            inner_kernel_vt(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
+            inner_kernel_t1(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
 
         }	
     }

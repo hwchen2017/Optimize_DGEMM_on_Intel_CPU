@@ -31,7 +31,7 @@ void test_dgemm_kernel(int num, int M, int N, int K, double alpha, double *A, do
 		break; 
 		case 8: dgemm_kernel_v8(M, N, K, alpha, A, M, B, K, beta, C, M); 
 		break;
-        case 0: dgemm_kernel_vt(M, N, K, alpha, A, M, B, K, beta, C, M); 
+        case 0: dgemm_kernel_t2(M, N, K, alpha, A, M, B, K, beta, C, M); 
 		break;
 // 		case 9: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
 // 		break;       
