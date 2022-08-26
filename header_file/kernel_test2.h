@@ -8,7 +8,7 @@
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
 
 #define ms 256
-#define ks 512
+#define ks 256
 
 
 void micro_kernel_4x4(int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
@@ -27,10 +27,12 @@ void micro_kernel_4x4(int K, double alpha, double *A, int LDA, double *B, int LD
 
         a = _mm256_mul_pd(valpha, _mm256_loadu_pd(&A[0]));
         A += 4; 
-        b0 = _mm256_broadcast_sd(&B(k, 0)); 
-        b1 = _mm256_broadcast_sd(&B(k, 1)); 
-        b2 = _mm256_broadcast_sd(&B(k, 2)); 
-        b3 = _mm256_broadcast_sd(&B(k, 3)); 
+        b0 = _mm256_broadcast_sd(&B[0]); 
+        b1 = _mm256_broadcast_sd(&B[1]); 
+        b2 = _mm256_broadcast_sd(&B[2]); 
+        b3 = _mm256_broadcast_sd(&B[3]);
+        
+        B += 4;
 
         c0 = _mm256_fmadd_pd(a, b0, c0); 
         c1 = _mm256_fmadd_pd(a, b1, c1); 
@@ -61,25 +63,49 @@ void pack_matrix_a(int K, double *A, int LDA, double *Abuffer)
     }
     
 }
+void pack_matrix_b(int K, double *B, int LDB, double *Bbuffer)
+{
+    double *pt0, *pt1, *pt2, *pt3; 
+    pt0 = &B(0, 0), pt1 = &B(0, 1); 
+    pt2 = &B(0, 2), pt3 = &B(0, 3); 
+    
+    for(int j=0;j<K;j++)
+    {
+        *Bbuffer = *pt0; pt0++;Bbuffer++; 
+        *Bbuffer = *pt1; pt1++;Bbuffer++; 
+        *Bbuffer = *pt2; pt2++;Bbuffer++; 
+        *Bbuffer = *pt3; pt3++;Bbuffer++; 
+    }
+    
+}
+
 
 
 
 void inner_kernel_t2(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB,  double *C, int LDC)
 {
     
-    double *Abuffer; 
+    double *Abuffer, *Bbuffer; 
     Abuffer = (double *)malloc(sizeof(double)*M*K);
+    Bbuffer = (double *)malloc(sizeof(double)*K*4);
+    
     
     for(int j=0;j<N;j+=4)
+    {
+        
+        pack_matrix_b(K, &B(0, j), LDB, Bbuffer); 
+        
         for(int i=0;i<M;i+=4)
 		{
             
             if(j == 0) pack_matrix_a(K, &A(i, 0), LDA, &Abuffer[i*K]); 
             
-			micro_kernel_4x4(K, alpha, &Abuffer[i*K], 4, &B(0, j), LDB, &C(i, j), LDC);
+			micro_kernel_4x4(K, alpha, &Abuffer[i*K], 4, Bbuffer, LDB, &C(i, j), LDC);
 
 		}
-    
+    }
+        
+    free(Bbuffer);
     free(Abuffer); 
 
 }
