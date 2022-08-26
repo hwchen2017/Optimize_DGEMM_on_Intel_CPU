@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 	double *A, *B, *C, *C_mkl;
 
 	double alpha = 1.0, beta = 0.0; 
-	ss[3] = 1024; 
+	ss[3] = 2048; 
 
 	M = ss[3], N = ss[3], K = ss[3]; 
 

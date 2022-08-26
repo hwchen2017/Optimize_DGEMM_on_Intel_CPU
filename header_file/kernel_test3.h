@@ -7,7 +7,7 @@
 
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
 
-#define ms 256
+#define ms 512
 #define ks 512
 
 
@@ -59,44 +59,52 @@ void micro_kernel_8x8(int K, double alpha, double *A, int LDA, double *B, int LD
     _mm512_storeu_pd(&C(0, 2), _mm512_add_pd(c2, _mm512_loadu_pd(&C(0, 2)))); 
     _mm512_storeu_pd(&C(0, 3), _mm512_add_pd(c3, _mm512_loadu_pd(&C(0, 3)))); 
 
-    _mm512_storeu_pd(&C(0, 4), _mm512_add_pd(c0, _mm512_loadu_pd(&C(0, 4)))); 
-    _mm512_storeu_pd(&C(0, 5), _mm512_add_pd(c1, _mm512_loadu_pd(&C(0, 5)))); 
-    _mm512_storeu_pd(&C(0, 6), _mm512_add_pd(c2, _mm512_loadu_pd(&C(0, 6)))); 
-    _mm512_storeu_pd(&C(0, 7), _mm512_add_pd(c3, _mm512_loadu_pd(&C(0, 7)))); 
-    
-    
+    _mm512_storeu_pd(&C(0, 4), _mm512_add_pd(c4, _mm512_loadu_pd(&C(0, 4)))); 
+    _mm512_storeu_pd(&C(0, 5), _mm512_add_pd(c5, _mm512_loadu_pd(&C(0, 5)))); 
+    _mm512_storeu_pd(&C(0, 6), _mm512_add_pd(c6, _mm512_loadu_pd(&C(0, 6)))); 
+    _mm512_storeu_pd(&C(0, 7), _mm512_add_pd(c7, _mm512_loadu_pd(&C(0, 7))));   
 }
+
 
 void pack_matrix_a8(int K, double *A, int LDA, double *Abuffer)
 {
-    
+    const int bs = 8; 
     double *pt; 
     for(int j=0;j<K;j++)
     {
-        pt = &A(0, j); 
-        *Abuffer = *pt; Abuffer++; 
-        *Abuffer = *(pt+1); Abuffer++; 
-        *Abuffer = *(pt+2); Abuffer++; 
-        *Abuffer = *(pt+3); Abuffer++; 
-        *Abuffer = *(pt+4); Abuffer++; 
-        *Abuffer = *(pt+5); Abuffer++; 
-        *Abuffer = *(pt+6); Abuffer++; 
-        *Abuffer = *(pt+7); Abuffer++; 
+        pt = &A(0, j);
+
+        for(int i=0;i<bs;i++)
+        {
+            *Abuffer = *(pt+i);
+            Abuffer ++;
+        } 
+        // *Abuffer = *pt; Abuffer++; 
+        // *Abuffer = *(pt+1); Abuffer++; 
+        // *Abuffer = *(pt+2); Abuffer++; 
+        // *Abuffer = *(pt+3); Abuffer++; 
+        // *Abuffer = *(pt+4); Abuffer++; 
+        // *Abuffer = *(pt+5); Abuffer++; 
+        // *Abuffer = *(pt+6); Abuffer++; 
+        // *Abuffer = *(pt+7); Abuffer++; 
     }
     
 }
 void pack_matrix_b8(int K, double *B, int LDB, double *Bbuffer)
 {
+
     double *pt0, *pt1, *pt2, *pt3; 
     pt0 = &B(0, 0), pt1 = &B(0, 1); 
     pt2 = &B(0, 2), pt3 = &B(0, 3); 
 
     double *pt4, *pt5, *pt6, *pt7; 
-    pt0 = &B(0, 4), pt1 = &B(0, 5); 
-    pt2 = &B(0, 6), pt3 = &B(0, 7); 
+    pt4 = &B(0, 4), pt5 = &B(0, 5); 
+    pt6 = &B(0, 6), pt7 = &B(0, 7); 
+
     
     for(int j=0;j<K;j++)
     {
+
         *Bbuffer = *pt0; pt0++;Bbuffer++; 
         *Bbuffer = *pt1; pt1++;Bbuffer++; 
         *Bbuffer = *pt2; pt2++;Bbuffer++; 
@@ -131,6 +139,7 @@ void inner_kernel_t3(int M, int N, int K, double alpha, double *A, int LDA, doub
 		{
             
             if(j == 0) pack_matrix_a8(K, &A(i, 0), LDA, &Abuffer[i*K]); 
+
             
 			micro_kernel_8x8(K, alpha, &Abuffer[i*K], 8, Bbuffer, LDB, &C(i, j), LDC);
 
@@ -159,13 +168,18 @@ void dgemm_kernel_t3(int M, int N, int K, double alpha, double *A, int LDA, doub
 		
     for(int kpos = 0; kpos < K; kpos += ks)
     {
-       kstep = min(ks, K - kpos);
+
+        kstep = min(ks, K - kpos);
+
+        // printf("%d \n", kpos);
 
         for(int mpos = 0; mpos < M; mpos += ms)
         {
-           mstep = min(ms, M - mpos);
+            mstep = min(ms, M - mpos);
 
-            inner_kernel_t2(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
+            // printf("%d \n", mpos);
+
+            inner_kernel_t3(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
 
         }	
     }

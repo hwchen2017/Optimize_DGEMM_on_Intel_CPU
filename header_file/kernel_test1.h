@@ -7,7 +7,7 @@
 
 #define min( i, j ) ( (i)<(j) ? (i): (j) )
 
-#define ms 256
+#define ms 512
 #define ks 512
 
 
