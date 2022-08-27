@@ -24,11 +24,4 @@ void dgemm_kernel_v2(int M, int N, int K, double alpha, double *A, int LDA, doub
 		}
 
 
-	// for(int i=0;i<M;i++)
-	// 	for(int k=0;k<K;k++)
-	// 		for(int j=0;j<N;j++)
-	// 		{
-	// 			C(i, j) += alpha * A(i, k) * B(k, j);
-	// 		}
-
 }

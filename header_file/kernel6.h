@@ -65,7 +65,7 @@ void dgemm_kernel_v6(int M, int N, int K, double alpha, double *A, int LDA, doub
 			C[i] *= beta; 
 	}
     
-    printf("Working kernel T1!\n");
+    // printf("Working kernel T1!\n");
 
 	int mstep, kstep; 
 		

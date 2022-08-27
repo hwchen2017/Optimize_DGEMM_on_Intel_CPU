@@ -6,6 +6,7 @@
 #include <cstdbool>
 #include <chrono>
 #include <mkl.h>
+#include <unistd.h>
 #include "utils.h"
 #include "kernels.h"
 
@@ -42,29 +43,34 @@ void test_dgemm_kernel(int num, int M, int N, int K, double alpha, double *A, do
 int main(int argc, char *argv[])
 {
 
-	int kernel_num = 0; 
+	int kernel_num = 0;
+	int sys_size = 2048; 
 
-	if(argc == 2) kernel_num=atoi(argv[1]);
+	char ch; 
+	while((ch = getopt(argc, argv, "k:n:")) != EOF)
+	{
+		switch(ch)
+		{
+			case 'k' : kernel_num = atoi(optarg);
+			break; 
+			case 'n' : sys_size = atoi(optarg); 
+			break; 
 
-	// cout<<kernel_num<<endl; 
+		}
+	}
 
-	vector<int> ss; 
-
-	for(int i=1;i<=25;i++)
-		ss.push_back(i*128); 
-
-
-
+	if(kernel_num > 9 or kernel_num < 0)
+		kernel_num = 0; 
+	
 	int M, N, K;
-
 	double *A, *B, *C, *C_mkl;
+	double alpha = 1.0, beta = 0.0;  
 
-	double alpha = 1.0, beta = 0.0; 
-	ss[3] = 1024; 
+	M = sys_size, N = sys_size, K = sys_size; 
+	
+	printf("\nMatrix Size: %d X %d, %d X %d\n", M, K, K, N ); 
+	cout<<"Kernel number: "<<kernel_num<<endl<<endl;
 
-	M = ss[3], N = ss[3], K = ss[3]; 
-
-	printf("Matrix Size: %dX%d, %dX%d\n\n", M, K, K, N ); 
 
 	A = (double *)malloc(sizeof(double) * M * K);
 	B = (double *)malloc(sizeof(double) * K * N); 
@@ -84,13 +90,21 @@ int main(int argc, char *argv[])
 
     memset(C, 0, sizeof(C));
 
+    test_dgemm_kernel(kernel_num, M, N, K, alpha, A, B, beta, C); 
+
 	auto start = std::chrono::high_resolution_clock::now();
-	test_dgemm_kernel(kernel_num, M, N, K, alpha, A, B, beta, C); 
+
+	for(int i=0;i<10;i++)
+	{
+		test_dgemm_kernel(kernel_num, M, N, K, alpha, A, B, beta, C); 
+	}
+	
 
 	auto end = std::chrono::high_resolution_clock::now(); 
 	auto elapsed = end - start;
 
 	double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3;
+	time_ms /= 10.0; 
 
 	cout<<"===================MY CPU code====================="<<endl;
 	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl;
@@ -112,26 +126,25 @@ int main(int argc, char *argv[])
 
 	mkl_set_num_threads(1); 
 
-
-	start = std::chrono::high_resolution_clock::now();
-
+	//warm up
 	cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, A, M, B, K, beta, C_mkl, M);
 
-	end = std::chrono::high_resolution_clock::now();
-	elapsed = end - start; 
 
-	time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3 ;
 // 	cout<<"Time: "<<time_ms<<" ms"<<endl;
 
 
 	start = std::chrono::high_resolution_clock::now();
 
-	cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, A, M, B, K, beta, C_mkl, M);
+	for(int i=0;i<10;i++)
+	{
+		cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, A, M, B, K, beta, C_mkl, M);
+	}
 
 	end = std::chrono::high_resolution_clock::now();
 	elapsed = end - start; 
 
 	time_ms = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count() * 1e-3 ;
+	time_ms /= 10.0;
 
 	cout<<"===================Intel MKL code====================="<<endl;
 	cout<<"Elapsed Time: "<<time_ms<<" ms"<<endl;

@@ -181,7 +181,7 @@ void dgemm_kernel_v9(int M, int N, int K, double alpha, double *A, int LDA, doub
 			C[i] *= beta; 
 	}
     
-    printf("Working kernel T4!\n");
+    // printf("Working kernel T4!\n");
 
 	int mstep, kstep; 
 		

@@ -162,7 +162,7 @@ void dgemm_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, doub
 			C[i] *= beta; 
 	}
     
-    printf("Working kernel T3!\n");
+    // printf("Working kernel T3!\n");
 
 	int mstep, kstep; 
 		

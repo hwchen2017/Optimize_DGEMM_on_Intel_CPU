@@ -80,7 +80,6 @@ void dgemm_kernel_v5(int M, int N, int K, double alpha, double *A, int LDA, doub
 
 	if(N != n1)
 	{
-		// printf("h1\n");
 		dgemm_boundary_v5(m1, N-n1, K, alpha, A, LDA, &B(0, n1), LDB, &C(0, n1), LDC); 
 	}
 
