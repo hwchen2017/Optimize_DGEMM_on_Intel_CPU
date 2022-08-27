@@ -31,10 +31,10 @@ void test_dgemm_kernel(int num, int M, int N, int K, double alpha, double *A, do
 		break; 
 		case 8: dgemm_kernel_v8(M, N, K, alpha, A, M, B, K, beta, C, M); 
 		break;
-        case 0: dgemm_kernel_t3(M, N, K, alpha, A, M, B, K, beta, C, M); 
+        case 9: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
 		break;
-// 		case 9: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
-// 		break;       
+		case 0: dgemm_kernel_v9(M, N, K, alpha, A, M, B, K, beta, C, M); 
+		break;       
 	}
 }
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 	double *A, *B, *C, *C_mkl;
 
 	double alpha = 1.0, beta = 0.0; 
-	ss[3] = 2048; 
+	ss[3] = 1024; 
 
 	M = ss[3], N = ss[3], K = ss[3]; 
 

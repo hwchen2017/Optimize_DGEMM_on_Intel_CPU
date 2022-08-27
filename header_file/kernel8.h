@@ -5,107 +5,151 @@
 #define B(k, j) B[(k) + (j)*LDB]
 #define C(i, j) C[(i) + (j)*LDC]
 
-#define mb_size 192
-#define nb_size 1024
-#define kb_size 384
+#define min( i, j ) ( (i)<(j) ? (i): (j) )
 
-#define Kernel_k1_8x4_avx2\
-	a0 = _mm256_mul_pd(valpha, _mm256_loadu_pd(&A(i, k)));\
-	a1 = _mm256_mul_pd(valpha, _mm256_loadu_pd(&A(i+4, k)));\
-	b0 = _mm256_broadcast_sd(&B(k, j)); \
-	b1 = _mm256_broadcast_sd(&B(k, j+1)); \
-	b2 = _mm256_broadcast_sd(&B(k, j+2));\
-	b3 = _mm256_broadcast_sd(&B(k, j+3)); \
-	c00 = _mm256_fmadd_pd(a0, b0, c00); \
-	c01 = _mm256_fmadd_pd(a0, b1, c01); \
-	c02 = _mm256_fmadd_pd(a0, b2, c02); \
-	c03 = _mm256_fmadd_pd(a0, b3, c03); \
-	c10 = _mm256_fmadd_pd(a1, b0, c10); \
-	c11 = _mm256_fmadd_pd(a1, b1, c11); \
-	c12 = _mm256_fmadd_pd(a1, b2, c12); \
-	c13 = _mm256_fmadd_pd(a1, b3, c13); \
-	k++;
+#define ms 512
+#define ks 512
 
 
-
-
-void dgemm_boundary_v8(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC )
+void micro_kernel_8x8(int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
 {
+    
+    __m512d valpha = _mm512_set1_pd(alpha); 
+    __m512d a, b0, b1, b2, b3, b4, b5, b6, b7;
+    
+    __m512d c0 = _mm512_setzero_pd(); 
+    __m512d c1 = _mm512_setzero_pd(); 
+    __m512d c2 = _mm512_setzero_pd(); 
+    __m512d c3 = _mm512_setzero_pd(); 
+    __m512d c4 = _mm512_setzero_pd(); 
+    __m512d c5 = _mm512_setzero_pd(); 
+    __m512d c6 = _mm512_setzero_pd(); 
+    __m512d c7 = _mm512_setzero_pd(); 
 
-	for(int i=0;i<M;i++)
-		for(int j=0;j<N;j++)
-		{
-			double tmp = C(i, j); 
-			for(int k=0;k<K;k++)
-				tmp += alpha * A(i, k) * B(k, j); 
+    for(int k=0;k<K;k++)
+    {
 
-			C(i, j) = tmp; 
-		}
+        a = _mm512_mul_pd(valpha, _mm512_loadu_pd(&A[0]));
+        A += 8; 
 
+        b0 = _mm512_set1_pd(B[0]); 
+        b1 = _mm512_set1_pd(B[1]); 
+        b2 = _mm512_set1_pd(B[2]); 
+        b3 = _mm512_set1_pd(B[3]);
+        b4 = _mm512_set1_pd(B[4]); 
+        b5 = _mm512_set1_pd(B[5]); 
+        b6 = _mm512_set1_pd(B[6]); 
+        b7 = _mm512_set1_pd(B[7]);
+        
+        B += 8;
+
+        c0 = _mm512_fmadd_pd(a, b0, c0); 
+        c1 = _mm512_fmadd_pd(a, b1, c1); 
+        c2 = _mm512_fmadd_pd(a, b2, c2); 
+        c3 = _mm512_fmadd_pd(a, b3, c3);
+        c4 = _mm512_fmadd_pd(a, b4, c4); 
+        c5 = _mm512_fmadd_pd(a, b5, c5); 
+        c6 = _mm512_fmadd_pd(a, b6, c6); 
+        c7 = _mm512_fmadd_pd(a, b7, c7);  
+
+    }
+
+    _mm512_storeu_pd(&C(0, 0), _mm512_add_pd(c0, _mm512_loadu_pd(&C(0, 0)))); 
+    _mm512_storeu_pd(&C(0, 1), _mm512_add_pd(c1, _mm512_loadu_pd(&C(0, 1)))); 
+    _mm512_storeu_pd(&C(0, 2), _mm512_add_pd(c2, _mm512_loadu_pd(&C(0, 2)))); 
+    _mm512_storeu_pd(&C(0, 3), _mm512_add_pd(c3, _mm512_loadu_pd(&C(0, 3)))); 
+
+    _mm512_storeu_pd(&C(0, 4), _mm512_add_pd(c4, _mm512_loadu_pd(&C(0, 4)))); 
+    _mm512_storeu_pd(&C(0, 5), _mm512_add_pd(c5, _mm512_loadu_pd(&C(0, 5)))); 
+    _mm512_storeu_pd(&C(0, 6), _mm512_add_pd(c6, _mm512_loadu_pd(&C(0, 6)))); 
+    _mm512_storeu_pd(&C(0, 7), _mm512_add_pd(c7, _mm512_loadu_pd(&C(0, 7))));   
 }
 
-void sub_dgemm_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
+
+void pack_matrix_a8(int K, double *A, int LDA, double *Abuffer)
+{
+    const int bs = 8; 
+    double *pt; 
+    for(int j=0;j<K;j++)
+    {
+        pt = &A(0, j);
+
+        for(int i=0;i<bs;i++)
+        {
+            *Abuffer = *(pt+i);
+            Abuffer ++;
+        } 
+        // *Abuffer = *pt; Abuffer++; 
+        // *Abuffer = *(pt+1); Abuffer++; 
+        // *Abuffer = *(pt+2); Abuffer++; 
+        // *Abuffer = *(pt+3); Abuffer++; 
+        // *Abuffer = *(pt+4); Abuffer++; 
+        // *Abuffer = *(pt+5); Abuffer++; 
+        // *Abuffer = *(pt+6); Abuffer++; 
+        // *Abuffer = *(pt+7); Abuffer++; 
+    }
+    
+}
+void pack_matrix_b8(int K, double *B, int LDB, double *Bbuffer)
 {
 
-	int m1 = M - M%8; 
-	int n1 = N - N%4; 
-	int k1 = K - K%4; 
+    double *pt0, *pt1, *pt2, *pt3; 
+    pt0 = &B(0, 0), pt1 = &B(0, 1); 
+    pt2 = &B(0, 2), pt3 = &B(0, 3); 
 
-	__m256d valpha = _mm256_set1_pd(alpha); 
-	__m256d a0, a1,  b0, b1, b2, b3; 
+    double *pt4, *pt5, *pt6, *pt7; 
+    pt4 = &B(0, 4), pt5 = &B(0, 5); 
+    pt6 = &B(0, 6), pt7 = &B(0, 7); 
 
+    
+    for(int j=0;j<K;j++)
+    {
 
-	for(int i=0;i<m1;i+=8)
-		for(int j=0;j<n1;j+=4)
-		{
-			
-			__m256d c00 = _mm256_setzero_pd(); 
-			__m256d c01 = _mm256_setzero_pd(); 
-			__m256d c02 = _mm256_setzero_pd(); 
-			__m256d c03 = _mm256_setzero_pd(); 
-			__m256d c10 = _mm256_setzero_pd(); 
-			__m256d c11 = _mm256_setzero_pd(); 
-			__m256d c12 = _mm256_setzero_pd(); 
-			__m256d c13 = _mm256_setzero_pd(); 
+        *Bbuffer = *pt0; pt0++;Bbuffer++; 
+        *Bbuffer = *pt1; pt1++;Bbuffer++; 
+        *Bbuffer = *pt2; pt2++;Bbuffer++; 
+        *Bbuffer = *pt3; pt3++;Bbuffer++; 
 
+        *Bbuffer = *pt4; pt4++;Bbuffer++; 
+        *Bbuffer = *pt5; pt5++;Bbuffer++; 
+        *Bbuffer = *pt6; pt6++;Bbuffer++; 
+        *Bbuffer = *pt7; pt7++;Bbuffer++; 
 
-			for(int k=0;k<k1;)
-			{
-				Kernel_k1_8x4_avx2 
-				Kernel_k1_8x4_avx2 
-				Kernel_k1_8x4_avx2 
-				Kernel_k1_8x4_avx2 
-			}
-
-			for(int k=k1;k<K;)
-			{
-				Kernel_k1_8x4_avx2
-			}
-
-			_mm256_storeu_pd(&C(i, j), _mm256_add_pd(c00, _mm256_loadu_pd(&C(i, j)))); 
-			_mm256_storeu_pd(&C(i, j+1), _mm256_add_pd(c01, _mm256_loadu_pd(&C(i, j+1)))); 
-			_mm256_storeu_pd(&C(i, j+2), _mm256_add_pd(c02, _mm256_loadu_pd(&C(i, j+2)))); 
-			_mm256_storeu_pd(&C(i, j+3), _mm256_add_pd(c03, _mm256_loadu_pd(&C(i, j+3)))); 
-
-			_mm256_storeu_pd(&C(i+4, j), _mm256_add_pd(c10, _mm256_loadu_pd(&C(i+4, j)))); 
-			_mm256_storeu_pd(&C(i+4, j+1), _mm256_add_pd(c11, _mm256_loadu_pd(&C(i+4, j+1)))); 
-			_mm256_storeu_pd(&C(i+4, j+2), _mm256_add_pd(c12, _mm256_loadu_pd(&C(i+4, j+2)))); 
-			_mm256_storeu_pd(&C(i+4, j+3), _mm256_add_pd(c13, _mm256_loadu_pd(&C(i+4, j+3)))); 
-		}
-	
-	
-	if(M != m1)
-	{
-		dgemm_boundary_v8(M-m1, N, K, alpha, A+m1, LDA, B, LDB, C+m1, LDC); 
-	}
-
-	if(N != n1)
-	{
-		dgemm_boundary_v8(m1, N-n1, K, alpha, A, LDA, &B(0, n1), LDB, &C(0, n1), LDC); 
-	}
-
+    }
+    
 }
 
+
+
+
+void inner_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB,  double *C, int LDC)
+{
+    
+    double *Abuffer, *Bbuffer; 
+    Abuffer = (double *)malloc(sizeof(double)*M*K);
+    Bbuffer = (double *)malloc(sizeof(double)*K*8);
+    
+    
+    for(int j=0;j<N;j+=8)
+    {
+        
+        pack_matrix_b8(K, &B(0, j), LDB, Bbuffer); 
+        
+        for(int i=0;i<M;i+=8)
+		{
+            
+            if(j == 0) pack_matrix_a8(K, &A(i, 0), LDA, &Abuffer[i*K]); 
+
+            
+			micro_kernel_8x8(K, alpha, &Abuffer[i*K], 8, Bbuffer, LDB, &C(i, j), LDC);
+
+		}
+    }
+        
+    free(Bbuffer);
+    free(Abuffer); 
+
+}
 
 
 void dgemm_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double beta, double *C, int LDC)
@@ -117,30 +161,27 @@ void dgemm_kernel_v8(int M, int N, int K, double alpha, double *A, int LDA, doub
 		for(int i=0;i<M*N;i++)
 			C[i] *= beta; 
 	}
+    
+    printf("Working kernel T3!\n");
 
-	int mstep, kstep, nstep; 
-
-	for(int npos = 0; npos < N; npos += nstep)
-	{
-		if(N - npos >= nb_size) nstep = nb_size;
-		else nstep = N - npos; 
+	int mstep, kstep; 
 		
-		for(int kpos = 0; kpos < K; kpos += kstep)
-		{
-			if(K - kpos > kb_size) kstep = kb_size; 
-			else kstep = K - kpos;  
+    for(int kpos = 0; kpos < K; kpos += ks)
+    {
 
-			for(int mpos = 0; mpos < M; mpos += mstep)
-			{
+        kstep = min(ks, K - kpos);
 
-				if(M - mpos > mb_size) mstep = mb_size; 
-				else mstep = M - mpos; 
+        // printf("%d \n", kpos);
 
-				sub_dgemm_kernel_v8(mstep, nstep, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, npos), LDB, &C(mpos, npos), LDC); 
+        for(int mpos = 0; mpos < M; mpos += ms)
+        {
+            mstep = min(ms, M - mpos);
 
-			}	
-		}
+            // printf("%d \n", mpos);
 
-	}
+            inner_kernel_v8(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
+
+        }	
+    }
 
 }

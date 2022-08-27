@@ -5,208 +5,170 @@
 #define B(k, j) B[(k) + (j)*LDB]
 #define C(i, j) C[(i) + (j)*LDC]
 
-#define mb_size 192
-#define nb_size 1024
-#define kb_size 384
-// const int mb_size = 192;
-// const int nb_size = 1024;
-// const int kb_size = 384;
+#define min( i, j ) ( (i)<(j) ? (i): (j) )
 
-void dgemm_boundary_k9(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC )
+#define ms 512
+#define ks 512
+
+
+void micro_kernel_16x8(int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
 {
-
-	for(int i=0;i<M;i++)
-		for(int j=0;j<N;j++)
-		{
-			double tmp = C(i, j); 
-			for(int k=0;k<K;k++)
-				tmp += alpha * A(i, k) * B(k, j); 
-
-			C(i, j) = tmp; 
-		}
-}
-
-#define Kernel_k9_4x4_avx2 \
-	a = _mm256_mul_pd(valpha, _mm256_loadu_pd(pack_a));\
-	b0 = _mm256_broadcast_sd(pack_b); \
-	b1 = _mm256_broadcast_sd(pack_b+1); \
-	b2 = _mm256_broadcast_sd(pack_b+2);\
-	b3 = _mm256_broadcast_sd(pack_b+3); \
-	c0 = _mm256_fmadd_pd(a, b0, c0); \
-	c1 = _mm256_fmadd_pd(a, b1, c1); \
-	c2 = _mm256_fmadd_pd(a, b2, c2); \
-	c3 = _mm256_fmadd_pd(a, b3, c3); \
-	pack_a += 8;\
-	pack_b += 4;\
-	k++;
+    
+    __m512d valpha = _mm512_set1_pd(alpha); 
+    __m512d a1, a2, b0, b1, b2, b3, b4, b5, b6, b7;
 
 
-#define kernel_4xkx4_packing \
-	__m256d c0 = _mm256_setzero_pd(); \
-	__m256d c1 = _mm256_setzero_pd(); \
-	__m256d c2 = _mm256_setzero_pd(); \
-	__m256d c3 = _mm256_setzero_pd(); \
-	for(int k=0;k<k1;){\
-		Kernel_k9_4x4_avx2\
-		Kernel_k9_4x4_avx2 \
-		Kernel_k9_4x4_avx2 \
-		Kernel_k9_4x4_avx2 \
-	}\
-	for(int k=k1;k<K;)\
-	{\
-		Kernel_k9_4x4_avx2\
-	}\
-	_mm256_storeu_pd(&C(i, j), _mm256_add_pd(c0, _mm256_loadu_pd(&C(i, j))));\
-	_mm256_storeu_pd(&C(i, j+1), _mm256_add_pd(c1, _mm256_loadu_pd(&C(i, j+1))));\
-	_mm256_storeu_pd(&C(i, j+2), _mm256_add_pd(c2, _mm256_loadu_pd(&C(i, j+2)))); \
-	_mm256_storeu_pd(&C(i, j+3), _mm256_add_pd(c3, _mm256_loadu_pd(&C(i, j+3))));
-
-#define Kernel_k9_8x4_avx2 \
-	a0 = _mm256_mul_pd(valpha, _mm256_loadu_pd(pack_a));\
-	a1 = _mm256_mul_pd(valpha, _mm256_loadu_pd(pack_a+4));\
-	b0 = _mm256_broadcast_sd(pack_b);\
-	b1 = _mm256_broadcast_sd(pack_b+1);\
-	b2 = _mm256_broadcast_sd(pack_b+2);\
-	b3 = _mm256_broadcast_sd(pack_b+3);\
-	c00 = _mm256_fmadd_pd(a0, b0, c00);\
-	c01 = _mm256_fmadd_pd(a0, b1, c01);\
-	c02 = _mm256_fmadd_pd(a0, b2, c02); \
-	c03 = _mm256_fmadd_pd(a0, b3, c03); \
-	c10 = _mm256_fmadd_pd(a1, b0, c10); \
-	c11 = _mm256_fmadd_pd(a1, b1, c11); \
-	c12 = _mm256_fmadd_pd(a1, b2, c12); \
-	c13 = _mm256_fmadd_pd(a1, b3, c13); \
-	pack_a += 8;\
-	pack_b += 4;\
-	k++;
-
-#define kernel_8xkx4_packing \
-	__m256d c00 = _mm256_setzero_pd();\
-	__m256d c01 = _mm256_setzero_pd();\
-	__m256d c02 = _mm256_setzero_pd();\
-	__m256d c03 = _mm256_setzero_pd();\
-	__m256d c10 = _mm256_setzero_pd();\
-	__m256d c11 = _mm256_setzero_pd();\
-	__m256d c12 = _mm256_setzero_pd();\
-	__m256d c13 = _mm256_setzero_pd();\
-	for(int k=0;k<k1;)\
-	{\
-		Kernel_k1_8x4_avx2\
-		Kernel_k1_8x4_avx2\
-		Kernel_k1_8x4_avx2\
-		Kernel_k1_8x4_avx2\
-	}\
-	for(int k=k1;k<K;)\
-	{\
-		Kernel_k1_8x4_avx2\
-	}\
-	_mm256_storeu_pd(&C(i, j), _mm256_add_pd(c00, _mm256_loadu_pd(&C(i, j))));\
-	_mm256_storeu_pd(&C(i, j+1), _mm256_add_pd(c01, _mm256_loadu_pd(&C(i, j+1))));\
-	_mm256_storeu_pd(&C(i, j+2), _mm256_add_pd(c02, _mm256_loadu_pd(&C(i, j+2))));\
-	_mm256_storeu_pd(&C(i, j+3), _mm256_add_pd(c03, _mm256_loadu_pd(&C(i, j+3))));\
-	_mm256_storeu_pd(&C(i+4, j), _mm256_add_pd(c10, _mm256_loadu_pd(&C(i+4, j))));\
-	_mm256_storeu_pd(&C(i+4, j+1), _mm256_add_pd(c11, _mm256_loadu_pd(&C(i+4, j+1))));\
-	_mm256_storeu_pd(&C(i+4, j+2), _mm256_add_pd(c12, _mm256_loadu_pd(&C(i+4, j+2))));\
-	_mm256_storeu_pd(&C(i+4, j+3), _mm256_add_pd(c13, _mm256_loadu_pd(&C(i+4, j+3))));
+    __m512d c00 = _mm512_setzero_pd(); 
+    __m512d c01 = _mm512_setzero_pd(); 
+    __m512d c02 = _mm512_setzero_pd(); 
+    __m512d c03 = _mm512_setzero_pd(); 
+    __m512d c04 = _mm512_setzero_pd(); 
+    __m512d c05 = _mm512_setzero_pd(); 
+    __m512d c06 = _mm512_setzero_pd(); 
+    __m512d c07 = _mm512_setzero_pd(); 
 
 
+    __m512d c10 = _mm512_setzero_pd(); 
+    __m512d c11 = _mm512_setzero_pd(); 
+    __m512d c12 = _mm512_setzero_pd(); 
+    __m512d c13 = _mm512_setzero_pd(); 
+    __m512d c14 = _mm512_setzero_pd(); 
+    __m512d c15 = _mm512_setzero_pd(); 
+    __m512d c16 = _mm512_setzero_pd(); 
+    __m512d c17 = _mm512_setzero_pd(); 
+
+    for(int k=0;k<K;k++)
+    {
+
+        a1 = _mm512_mul_pd(valpha, _mm512_loadu_pd(&A[0]));
+        a2 = _mm512_mul_pd(valpha, _mm512_loadu_pd(&A[8]));
+        A += 16; 
 
 
+        b0 = _mm512_set1_pd(B[0]); 
+        b1 = _mm512_set1_pd(B[1]); 
+        b2 = _mm512_set1_pd(B[2]); 
+        b3 = _mm512_set1_pd(B[3]);
+        b4 = _mm512_set1_pd(B[4]); 
+        b5 = _mm512_set1_pd(B[5]); 
+        b6 = _mm512_set1_pd(B[6]); 
+        b7 = _mm512_set1_pd(B[7]);
+        
+        B += 8;
 
 
-void sub_dgemm_kernel_v9(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double *C, int LDC)
-{
+        c00 = _mm512_fmadd_pd(a1, b0, c00); 
+        c01 = _mm512_fmadd_pd(a1, b1, c01); 
+        c02 = _mm512_fmadd_pd(a1, b2, c02); 
+        c03 = _mm512_fmadd_pd(a1, b3, c03);
+        c04 = _mm512_fmadd_pd(a1, b4, c04); 
+        c05 = _mm512_fmadd_pd(a1, b5, c05); 
+        c06 = _mm512_fmadd_pd(a1, b6, c06); 
+        c07 = _mm512_fmadd_pd(a1, b7, c07);
 
-	int m1 = M - M%8; 
-	int n1 = N - N%4; 
-	int k1 = K - K%4; 
+        c10 = _mm512_fmadd_pd(a2, b0, c10); 
+        c11 = _mm512_fmadd_pd(a2, b1, c11); 
+        c12 = _mm512_fmadd_pd(a2, b2, c12); 
+        c13 = _mm512_fmadd_pd(a2, b3, c13);
+        c14 = _mm512_fmadd_pd(a2, b4, c14); 
+        c15 = _mm512_fmadd_pd(a2, b5, c15); 
+        c16 = _mm512_fmadd_pd(a2, b6, c16); 
+        c17 = _mm512_fmadd_pd(a2, b7, c17); 
 
-	double *pack_a = A; 
-	double *pack_b = B; 
+
+    }
 
 
-	__m256d valpha = _mm256_set1_pd(alpha); 
-	__m256d a, a0, a1, b0, b1, b2, b3; 
-	__m256d c00, c01, c02, c03, c10, c11, c12, c13; 
-	__m256d c0, c1, c2, c3; 
+    _mm512_storeu_pd(&C(0, 0), _mm512_add_pd(c00, _mm512_loadu_pd(&C(0, 0)))); 
+    _mm512_storeu_pd(&C(0, 1), _mm512_add_pd(c01, _mm512_loadu_pd(&C(0, 1)))); 
+    _mm512_storeu_pd(&C(0, 2), _mm512_add_pd(c02, _mm512_loadu_pd(&C(0, 2)))); 
+    _mm512_storeu_pd(&C(0, 3), _mm512_add_pd(c03, _mm512_loadu_pd(&C(0, 3)))); 
+    _mm512_storeu_pd(&C(0, 4), _mm512_add_pd(c04, _mm512_loadu_pd(&C(0, 4)))); 
+    _mm512_storeu_pd(&C(0, 5), _mm512_add_pd(c05, _mm512_loadu_pd(&C(0, 5)))); 
+    _mm512_storeu_pd(&C(0, 6), _mm512_add_pd(c06, _mm512_loadu_pd(&C(0, 6)))); 
+    _mm512_storeu_pd(&C(0, 7), _mm512_add_pd(c07, _mm512_loadu_pd(&C(0, 7)))); 
 
-	for(int i=0;i<m1;i+=8)
-		for(int j=0;j<n1;j+=4)
-		{
-			pack_a = A + i*K; 
-			pack_b = B + j*K; 
-
-			kernel_8xkx4_packing
-		}
-
-	for(int i=m1;i<M;i+=4)
-		for(int j=n1;j<N;j+=4)
-		{
-			pack_a = A + i*K; 
-			pack_b = B + j*K; 
-
-			kernel_4xkx4_packing
-		}
-}
-
-void pack_matrix_a(double *A, double *buffer, int LDA, int ms, int ks)
-{
-	double *pa, *pb; 
-	pb = buffer; 
-
-	int lm = ms, mi, ki; 
-
-	for(mi = 0; lm>8; mi += 8, lm -= 8 )
-	{
-		pa = A + mi; 
-
-		for(ki = 0; ki < ks; ki ++)
-		{
-			_mm512_store_pd(pb, _mm512_loadu_pd(pa)); 
-			pa += LDA; 
-			pb += 8; 
-		}
-	} 
-
-	for(; lm>3; mi += 4, lm -= 4 )
-	{
-		pa = A + mi; 
-
-		for(ki = 0; ki < ks; ki ++)
-		{
-			_mm256_store_pd(pb, _mm256_loadu_pd(pa)); 
-			pa += LDA; 
-			pb += 4; 
-		}
-	} 
+    _mm512_storeu_pd(&C(8, 0), _mm512_add_pd(c10, _mm512_loadu_pd(&C(8, 0)))); 
+    _mm512_storeu_pd(&C(8, 1), _mm512_add_pd(c11, _mm512_loadu_pd(&C(8, 1)))); 
+    _mm512_storeu_pd(&C(8, 2), _mm512_add_pd(c12, _mm512_loadu_pd(&C(8, 2)))); 
+    _mm512_storeu_pd(&C(8, 3), _mm512_add_pd(c13, _mm512_loadu_pd(&C(8, 3)))); 
+    _mm512_storeu_pd(&C(8, 4), _mm512_add_pd(c14, _mm512_loadu_pd(&C(8, 4)))); 
+    _mm512_storeu_pd(&C(8, 5), _mm512_add_pd(c15, _mm512_loadu_pd(&C(8, 5)))); 
+    _mm512_storeu_pd(&C(8, 6), _mm512_add_pd(c16, _mm512_loadu_pd(&C(8, 6)))); 
+    _mm512_storeu_pd(&C(8, 7), _mm512_add_pd(c17, _mm512_loadu_pd(&C(8, 7))));  
+  
 }
 
 
-void pack_matrix_b(double *B, double *buffer, int LDB, int ks, int ns )
+void pack_matrix_a16x8(int K, double *A, int LDA, double *Abuffer)
 {
-	double *p1, *p2, *p3, *p4, *pb;
+    const int bsx = 16; 
+    double *pt; 
+    for(int j=0;j<K;j++)
+    {
+        pt = &A(0, j);
 
-	pb = buffer; 
+        for(int i=0;i<bsx;i++)
+        {
+            *Abuffer = *(pt+i);
+            Abuffer ++;
+        } 
+    }
+    
+}
+void pack_matrix_b16x8(int K, double *B, int LDB, double *Bbuffer)
+{
 
-	for(int  ni = 0; ni < ns; ni += 4 )
-	{
-		p1 = B + ni * LDB;
-		p2 = p1 + LDB; 
-		p3 = p2 + LDB; 
-		p4 = p3 + LDB; 
+    const int bsy = 8; 
+    double *pt[bsy]; 
 
-		for(int ki=0;ki<ks;ki++)
-		{
-			pb = p1; p1++; pb++; 
-			pb = p2; p2++; pb++; 
-			pb = p3; p3++; pb++; 
-			pb = p4; p4++; pb++; 
-		}
-	}
+    for(int i=0;i<bsy;i++)
+        pt[i] = &B(0, i); 
 
+    
+    for(int j=0;j<K;j++)
+    {
 
+        for(int i=0;i<bsy;i++)
+        {
+            *Bbuffer = *pt[i]; 
+            pt[i]++; 
+            Bbuffer ++; 
+        }
+
+    }
+    
 }
 
+
+
+void inner_kernel_v9(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB,  double *C, int LDC)
+{
+    
+    double *Abuffer, *Bbuffer; 
+    Abuffer = (double *)malloc(sizeof(double)*M*K);
+    Bbuffer = (double *)malloc(sizeof(double)*K*8);
+    
+    
+    for(int j=0;j<N;j+=8)
+    {
+        
+        pack_matrix_b16x8(K, &B(0, j), LDB, Bbuffer); 
+        
+        for(int i=0;i<M;i+=16)
+		{
+            
+            if(j == 0) pack_matrix_a16x8(K, &A(i, 0), LDA, &Abuffer[i*K]); 
+ 
+			micro_kernel_16x8(K, alpha, &Abuffer[i*K], 16, Bbuffer, LDB, &C(i, j), LDC);
+
+		}
+    }
+        
+    free(Bbuffer);
+    free(Abuffer); 
+
+}
 
 
 void dgemm_kernel_v9(int M, int N, int K, double alpha, double *A, int LDA, double *B, int LDB, double beta, double *C, int LDC)
@@ -218,44 +180,27 @@ void dgemm_kernel_v9(int M, int N, int K, double alpha, double *A, int LDA, doub
 		for(int i=0;i<M*N;i++)
 			C[i] *= beta; 
 	}
+    
+    printf("Working kernel T4!\n");
 
-	double *b_buffer = (double*) aligned_alloc(4096, kb_size*nb_size * sizeof(double)); 
-	double *a_buffer = (double*) aligned_alloc(4096, kb_size*mb_size * sizeof(double)); 
-	
-	int mstep, kstep, nstep; 
-
-	for(int npos = 0; npos < N; npos += nstep)
-	{
-		if(N - npos >= nb_size) nstep = nb_size;
-		else nstep = N - npos; 
+	int mstep, kstep; 
 		
-		for(int kpos = 0; kpos < K; kpos += kstep)
-		{
-			if(K - kpos > kb_size) kstep = kb_size; 
-			else kstep = K - kpos; 
+    for(int kpos = 0; kpos < K; kpos += ks)
+    {
 
-			pack_matrix_b(B+kpos+npos*LDB, b_buffer, LDB, kstep, nstep);  
+        kstep = min(ks, K - kpos);
 
-			for(int mpos = 0; mpos < M; mpos += mstep)
-			{
+        // printf("%d \n", kpos);
 
-				if(M - mpos > mb_size) mstep = mb_size; 
-				else mstep = M - mpos; 
+        for(int mpos = 0; mpos < M; mpos += ms)
+        {
+            mstep = min(ms, M - mpos);
 
-				pack_matrix_a(A+mpos + kpos*LDA, a_buffer, LDA, mstep, kstep); 
+            // printf("%d \n", mpos);
 
+            inner_kernel_v9(mstep, N, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, 0), LDB, &C(mpos, 0), LDC); 
 
-				sub_dgemm_kernel_v9(mstep, nstep, kstep, alpha, &A(mpos, kpos), LDA, &B(kpos, npos), LDB, &C(mpos, npos), LDC); 
-
-
-			}	
-		}
-
-	}
-
-
-
-
-
+        }	
+    }
 
 }
